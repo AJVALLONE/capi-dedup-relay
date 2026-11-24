@@ -1,0 +1,18 @@
+<!-- Fire the browser pixel and the server event with the SAME event_id so Meta deduplicates. -->
+<script>
+  function trackDeduped(eventName, customData) {
+    var eventId = eventName + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    // 1) Browser pixel (may be blocked or fire too late on fast redirects)
+    if (typeof fbq === 'function') { fbq('track', eventName, customData || {}, { eventID: eventId }); }
+    // 2) Server relay (reliable). keepalive lets it finish even if the page navigates away.
+    var cookies = Object.fromEntries(document.cookie.split('; ').map(function (c) { return c.split('='); }));
+    fetch('/capi/event', {
+      method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_name: eventName, event_id: eventId, url: location.href,
+                             fbp: cookies._fbp, fbc: cookies._fbc, custom_data: customData || {} })
+    });
+    return eventId;
+  }
+  // Example: on a booking interstitial that redirects quickly
+  // trackDeduped('Schedule'); setTimeout(function(){ location.href = SCHEDULER_URL; }, 300);
+</script>
